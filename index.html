@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Noah's Vault - Seed Vault Protocol</title>
+<style>
+:root{--bg:#0a0f0d;--ink:#c5d8cc;--dim:#5f7a6b;--accent:#4ade80;--warn:#f0abfc;--line:#1d2b23;--card:#0f1613}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:26px 14px}
+h1{font-size:26px;letter-spacing:6px;color:var(--accent);text-transform:uppercase}
+.sub{color:var(--dim);letter-spacing:2.5px;font-size:10.5px;text-transform:uppercase;margin-top:6px}
+#vault{margin:18px 0;display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.cell{width:92px;height:74px;background:var(--card);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px}
+.cell small{font-size:9px;color:var(--dim);margin-top:5px;letter-spacing:1px;text-transform:uppercase;text-align:center}
+#hud{font-size:12px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;text-align:center;line-height:2}
+#hud b{color:var(--accent)}
+#hud .w{color:var(--warn)}
+#event{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);padding:16px 18px;width:min(560px,94vw);min-height:86px;font-size:13.5px;line-height:1.65;margin-top:12px}
+#event .tag{color:var(--warn);font-size:10px;letter-spacing:2px;display:block;margin-bottom:6px}
+#choices{display:grid;gap:9px;width:min(560px,94vw);margin-top:11px}
+button{cursor:pointer;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:13px 14px;font-family:inherit;font-size:13px;text-align:left;transition:border-color .15s}
+button:hover{border-color:var(--accent)}
+button small{display:block;color:var(--dim);font-size:11px;margin-top:3px}
+#log{width:min(560px,94vw);margin-top:14px;font-size:11.5px;color:var(--dim);line-height:1.75}
+</style>
+</head>
+<body>
+<h1>Noah's Vault</h1>
+<div class="sub">SVALBARD ANNEX 7 &middot; SEED PRESERVATION PROTOCOL &middot; CLEARANCE: CURATOR</div>
+<div id="vault"></div>
+<div id="hud"></div>
+<div id="event"></div>
+<div id="choices"></div>
+<div id="log"></div>
+<script>
+const $=id=>document.getElementById(id);
+const SEEDS=[['Wheat','🌾'],['Rice','🌾'],['Maize','🌽'],['Potato','🥔'],['Apple','🍎'],['Cacao','🍫']];
+const S={day:1,temp:-18,power:100,integrity:100,lost:0,over:false};
+const EVENTS=[
+ ['INCIDENT','Permafrost readings spike. Thermal drift detected in corridor C.',[['Vent emergency coolant','power -15, temp stabilized',s=>{s.power-=15;s.temp=-18}],['Let it ride','temp rises 4C, seeds at risk',s=>{s.temp+=4}],['Send a tech into the tunnel','integrity -8, temp -2C',s=>{s.integrity-=8;s.temp-=2}]]],
+ ['INCIDENT','A consortium offers funding for one shelf of pharma crops. The vault charter says food only.',[['Refuse, cite the charter','integrity +10',s=>{s.integrity+=10}],['Accept quietly','power +20, integrity -12',s=>{s.power+=20;s.integrity-=12}],['Negotiate: they fund the roof','power +10, integrity -4',s=>{s.power+=10;s.integrity-=4}]]],
+ ['INCIDENT','Generator 2 is down. Generator 1 hums louder than it should.',[['Ration power to the cold rooms','power +12, integrity -4',s=>{s.power+=12;s.integrity-=4}],['Run both hard','power -10, temp -1C',s=>{s.power-=10;s.temp-=1}],['Pray to the diesel gods','nothing happens, but morale',s=>{}]]],
+ ['INCIDENT','A nation requests its seeds back. Withdrawal protocol 12-B. The boxes look small in their hands.',[['Release the deposit','integrity +8, one seed line leaves',s=>{s.integrity+=8}],['Stall for paperwork','integrity -6',s=>{s.integrity-=6}],['Offer duplicates instead','integrity +3',s=>{s.integrity+=3}]]],
+ ['INCIDENT','Mold spores detected on level 2. The air smells sweet. That is bad.',[['Purge the level','power -12, threat removed',s=>{s.power-=12}],['Quarantine one shelf','lose a seed line',s=>{s.lost+=1}],['Increase airflow','temp +2C, maybe fine',s=>{s.temp+=2;if(Math.random()<.4)s.lost+=1}]]],
+ ['INCIDENT','An inspector arrives unannounced. Her badge is real. Her questions are better.',[['Full transparency','integrity +8',s=>{s.integrity+=8}],['Show her the good shelves','risky integrity',s=>{if(Math.random()<.5){s.integrity+=4}else{s.integrity-=15}}],['Wine and distract','integrity -5, power +5',s=>{s.integrity-=5;s.power+=5}]]],
+ ['INCIDENT','Deep frost heave. A wall crack whispers in the night shift audio logs.',[['Immediate repairs','power -8, integrity +10',s=>{s.power-=8;s.integrity+=10}],['Monitor it','integrity -8',s=>{s.integrity-=8}],['Log it as settling','integrity -3, power +3',s=>{s.integrity-=3;s.power+=3}]]],
+ ['INCIDENT','A new deposit arrives: heirloom tomatoes from a closed garden. Someone cried handing them over.',[['Catalog with full honors','integrity +6',s=>{s.integrity+=6}],['Standard intake','nothing special',s=>{}],['Expedited, skip quarantine','risky: spores?',s=>{if(Math.random()<.3)s.lost+=1}]]]];
+function clamp(x){return Math.max(0,Math.min(100,x))}
+function hud(){
+ $('hud').innerHTML='DAY <b>'+S.day+'</b>/15 &middot; TEMP <b class="'+(S.temp>-14?'w':'')+'">'+S.temp+'&deg;C</b> &middot; POWER <b>'+S.power+'%</b> &middot; CHARTER INTEGRITY <b>'+S.integrity+'%</b> &middot; SEED LINES LOST <b class="'+(S.lost?'w':'')+'">'+S.lost+'</b>';
+ $('vault').innerHTML=SEEDS.map((s,i)=>'<div class="cell">'+(i<S.lost?'❌':s[1])+'<small>'+(i<S.lost?'LOST':s[0])+'</small></div>').join('');}
+function log(t,c){const d=document.createElement('div');d.textContent=t;if(c)d.style.color=c;$('log').prepend(d);}
+function render(){
+ hud();if(S.over)return;
+ const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
+ $('event').innerHTML='<span class="tag">'+ev[0]+' // DAY '+S.day+'</span>'+ev[1];
+ $('choices').innerHTML='';
+ ev[2].forEach(o=>{
+  const b=document.createElement('button');
+  b.innerHTML=o[0]+'<small>'+o[1]+'</small>';
+  b.onclick=()=>{o[2](S);S.power=clamp(S.power);S.integrity=clamp(S.integrity);
+   log('Day '+S.day+': '+o[0]+'.');
+   S.day++;
+   if(S.power<=0){end(false,'Power failed on day '+S.day+'. The cold rooms warm by degrees. 900,000 futures, compost.','var(--warn)');}
+   else if(S.integrity<=0){end(false,'The charter is revoked. The vault becomes a very cold warehouse for someone else\'s priorities.','var(--warn)');}
+   else if(S.lost>=3){end(false,'Too many lines lost. The ark floats, but it is emptier than the flood would have left it.','var(--warn)');}
+   else if(S.day>15){end(true,'Fifteen days. Every seed accounted for. Somewhere above the permafrost, nothing happened - and that was everything.','var(--accent)');}
+   else render();};
+  $('choices').appendChild(b);});}
+function end(win,msg,c){S.over=true;hud();$('event').innerHTML='<span class="tag">FINAL LOG</span>'+msg;
+ $('choices').innerHTML='';const b=document.createElement('button');
+ b.textContent='Begin a new rotation';b.onclick=()=>{Object.assign(S,{day:1,temp:-18,power:100,integrity:100,lost:0,over:false});$('log').innerHTML='';render();};
+ $('choices').appendChild(b);log(msg,c);}
+render();
+</script>
+</body>
+</html>
